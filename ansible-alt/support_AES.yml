@@ -1,0 +1,17 @@
+- name: Check AES encryption support
+  hosts: client
+  tasks:
+    - name: Check AES support in kernel
+      command: grep aes /proc/crypto
+      register: kernel_aes_support
+      changed_when: false
+
+    - name: Check AES support for LUKS
+      command: cryptsetup benchmark | grep aes
+      register: luks_aes_support
+      changed_when: false
+
+    - name: Print result
+      debug:
+        msg: >
+          "Functional requirement: AES encryption is {{ 'supported' if kernel_aes_support.rc == 0 and luks_aes_support.rc == 0 else 'not supportes' }}"

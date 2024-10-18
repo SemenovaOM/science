@@ -1,0 +1,22 @@
+- name: Encrypt disk with LUKS
+  hosts: client
+  vars:
+    disk_to_encrypt: "/dev/sdb" # диск, который нужно зашифровать
+    luks_passphrase: "paroldlyadisk" # пароль для шифрования/расшифрования диска
+  tasks:
+    - name: Create LUKS partition
+      become: yes
+      shell: echo "{{ luks_passphrase }}" | cryptsetup luksFormat --batch-mode {{ disk_to_encrypt }}
+      ignore_errors: yes
+
+    - name: Open LUKS partition
+      become: yes
+      shell: echo "{{ luks_passphrase }}" | cryptsetup luksOpen {{ disk_to_encrypt }} encrypted_disk
+
+    - name: Create filesystem
+      become: yes
+      shell: mkfs.msdos /dev/mapper/encrypted_disk
+
+    - name: Mount encrypted disk
+      become: yes
+      shell: mount /dev/mapper/encrypted_disk /mnt/encrypted_disk

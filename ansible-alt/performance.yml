@@ -1,0 +1,54 @@
+- name: Measure performance of encrypted and unencrypted disk
+  hosts: client
+  vars:
+    luks_device: "/dev/sdc" # диск, который нужно зашифровать
+    luks_passphrase: "paroldlydisk" # пароль для шифрования/расшифрования диска
+    unencrypted_device: "/dev/sdd" # нешифрованный диск
+  
+  tasks:
+    - name: Create LUKS partition
+      become: yes
+      shell: echo "{{ luks_passphrase }}" | cryptsetup luksFormat --batch-mode {{ luks_device }}
+      ignore_errors: yes
+
+    - name: Open LUKS partition
+      become: yes
+      shell: echo "{{ luks_passphrase }}" | cryptsetup luksOpen {{ luks_device }} encrypted_disk_2
+      ignore_errors: yes
+      
+    - name: Read speed of LUKS partition
+      become: yes
+      shell: dd if=/dev/mapper/encrypted_disk_2 of=/dev/null bs=1M count=50 2>&1 | grep -oP '\d+\.?\d*\s*MB/s' | grep -oP '\d+\.?\d*'
+      register:  encrypted_read_speed
+
+    - name: Write speed of LUKS partition
+      become: yes
+      shell: dd if=/dev/zero of=/dev/mapper/encrypted_disk_2 bs=1M count=50 oflag=direct 2>&1 | grep -oP '\d+\.?\d*\s*MB/s' | grep -oP '\d+\.?\d*'
+      register: encrypted_write_speed
+
+    - name: Read speed of unencrypted disk
+      become: yes
+      shell: dd if={{ unencrypted_device }} of=/dev/null bs=1M count=50 2>&1 | grep -oP '\d+\.?\d*\s*MB/s' | grep -oP '\d+\.?\d*'
+      register: unencrypted_read_speed
+
+    - name: Write speed of unencrypted disk
+      become: yes
+      shell: dd if=/dev/zero of={{ unencrypted_device }} bs=1M count=50 oflag=direct 2>&1 | grep -oP '\d+\.?\d*\s*MB/s' | grep -oP '\d+\.?\d*'
+      register: unencrypted_write_speed
+
+    - name: Print performance between encrypted and encrypted disks
+      debug:
+        msg: >
+          "Encrypted disk performance: read speed - {{ encrypted_read_speed.stdout }} MB/s, write speed - {{ encrypted_write_speed.stdout }} MB/s.
+          Unencrypted disk performance: read speed - {{ unencrypted_read_speed.stdout }} MB/s, write speed - {{ unencrypted_write_speed.stdout }} MB/s."
+
+    - name: Calculate performance difference
+      set_fact:
+        read_speed_difference: "{{ ((unencrypted_read_speed.stdout | float - encrypted_read_speed.stdout | float) / unencrypted_read_speed.stdout | float) * 100 }}"
+        write_speed_difference: "{{ ((unencrypted_write_speed.stdout | float - encrypted_write_speed.stdout | float) / unencrypted_write_speed.stdout | float) * 100 }}"
+        
+    - name: Print performance differences
+      debug:
+        msg: >
+          "Read speed difference: {{ read_speed_difference }}%
+           Write speed difference: {{ write_speed_difference }}%"  
