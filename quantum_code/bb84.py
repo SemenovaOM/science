@@ -46,7 +46,7 @@ def bb84_protocol(key_length):
     
     bob_measurements = result.measurements['result'][0]
 
-    # Формируем ключ
+    # Формирование ключа
     key = ''.join(str(alice_bits[i]) for i in range(key_length) if alice_bases[i] == bob_bases[i])
     
     return key, bob_measurements
